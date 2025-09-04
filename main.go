@@ -2,7 +2,12 @@ package main
 
 import "C"
 
+/*
+#include <stdlib.h>
+#include <string.h>
+*/
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -31,6 +36,12 @@ func getCaptureTime(path string) string {
 	}
 	originalTime := strings.ReplaceAll(getTagString(exif.DateTimeOriginal), "\"", "")
 	return strings.Replace(originalTime, ":", "/", 2)
+}
+
+//export ScanDir
+func ScanDir(path *C.char) *C.char {
+	data, _ := json.Marshal(scanDir(C.GoString(path)))
+	return C.CString(string(data))
 }
 
 func scanDir(path string) []Photo {

@@ -1,12 +1,21 @@
 package main
 
+import "C"
+
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/rwcarlsen/goexif/exif"
 )
+
+type Photo struct {
+	Dir      string `json:"dir"`
+	Name     string `json:"name"`
+	DateTime string `json:"datetime"`
+}
 
 func getCaptureTime(path string) string {
 	f, _ := os.Open(path)
@@ -24,10 +33,25 @@ func getCaptureTime(path string) string {
 	return strings.Replace(originalTime, ":", "/", 2)
 }
 
-func archive() {
+func scanDir(path string) []Photo {
+	var files []Photo
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return files
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() && entry.Name() != ".DS_Store" {
+			files = append(files, Photo{
+				Name:     entry.Name(),
+				Dir:      path,
+				DateTime: getCaptureTime(filepath.Join(path, entry.Name())),
+			})
+		}
+	}
 
+	return files
 }
 
 func main() {
-	fmt.Println(getCaptureTime("/Users/zhoucheng/Downloads/DSC08068.ARW"))
+	fmt.Println(scanDir("/Users/zhoucheng/Pictures/临时"))
 }

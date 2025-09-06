@@ -23,10 +23,16 @@ type Photo struct {
 }
 
 func getCaptureTime(path string) string {
-	f, _ := os.Open(path)
+	f, err := os.Open(path)
+	if err != nil {
+		return ""
+	}
 	defer f.Close()
 
-	x, _ := exif.Decode(f)
+	x, err := exif.Decode(f)
+	if err != nil || x == nil {
+		return ""
+	}
 	getTagString := func(name exif.FieldName) string {
 		tag, err := x.Get(name)
 		if err != nil || tag == nil {
@@ -52,11 +58,14 @@ func scanDir(path string) []Photo {
 	}
 	for _, entry := range entries {
 		if !entry.IsDir() && entry.Name() != ".DS_Store" {
-			files = append(files, Photo{
-				Name:     entry.Name(),
-				Dir:      path,
-				DateTime: getCaptureTime(filepath.Join(path, entry.Name())),
-			})
+			datetime := getCaptureTime(filepath.Join(path, entry.Name()))
+			if datetime != "" {
+				files = append(files, Photo{
+					Name:     entry.Name(),
+					Dir:      path,
+					DateTime: datetime,
+				})
+			}
 		}
 	}
 
@@ -64,5 +73,5 @@ func scanDir(path string) []Photo {
 }
 
 func main() {
-	fmt.Println(scanDir("/Users/zhoucheng/Pictures/临时"))
+	fmt.Println(scanDir("/Users/zhoucheng/Downloads/神经网络训练"))
 }

@@ -22,6 +22,30 @@ type Photo struct {
 	DateTime string `json:"datetime"`
 }
 
+//export GetPhoto
+func GetPhoto(path *C.char) *C.char {
+	var data Photo = getPhoto(C.GoString(path))
+	if data == (Photo{}) {
+		return C.CString("")
+	}
+
+	json, _ := json.Marshal(data)
+
+	return C.CString(string(json))
+}
+
+func getPhoto(path string) Photo {
+	datetime := getCaptureTime(path)
+	if datetime == "" {
+		return Photo{}
+	}
+	return Photo{
+		Dir:      filepath.Dir(path),
+		Name:     filepath.Base(path),
+		DateTime: datetime,
+	}
+}
+
 func getCaptureTime(path string) string {
 	f, err := os.Open(path)
 	if err != nil {

@@ -46,7 +46,14 @@ func getCaptureTime(path string) string {
 
 //export ScanDir
 func ScanDir(path *C.char) *C.char {
-	data, _ := json.Marshal(scanDir(C.GoString(path)))
+	files := scanDir(C.GoString(path))
+	if len(files) == 0 {
+		return C.CString("[]")
+	}
+	data, err := json.Marshal(files)
+	if err != nil {
+		return C.CString("[]")
+	}
 	return C.CString(string(data))
 }
 
@@ -73,5 +80,5 @@ func scanDir(path string) []Photo {
 }
 
 func main() {
-	fmt.Println(scanDir("/Users/zhoucheng/Downloads/神经网络训练"))
+	fmt.Println(scanDir("/Users/zhoucheng/Downloads/照片"))
 }

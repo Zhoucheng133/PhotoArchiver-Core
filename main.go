@@ -12,9 +12,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 
 	"github.com/rwcarlsen/goexif/exif"
 )
+
+var stopFlag atomic.Bool
 
 type Photo struct {
 	Dir      string `json:"dir"`
@@ -68,6 +71,11 @@ func getCaptureTime(path string) string {
 	return strings.Replace(originalTime, ":", "/", 2)
 }
 
+//export StopScan
+func StopScan() {
+	stopFlag.Store(true)
+}
+
 //export ScanDir
 func ScanDir(path *C.char) *C.char {
 	files := scanDir(C.GoString(path))
@@ -82,12 +90,16 @@ func ScanDir(path *C.char) *C.char {
 }
 
 func scanDir(path string) []Photo {
+	stopFlag.Store(false)
 	var files []Photo
 	entries, err := os.ReadDir(path)
 	if err != nil {
 		return files
 	}
 	for _, entry := range entries {
+		if stopFlag.Load() {
+			return files
+		}
 		if !entry.IsDir() && entry.Name() != ".DS_Store" {
 			datetime := getCaptureTime(filepath.Join(path, entry.Name()))
 			if datetime != "" {

@@ -14,4 +14,10 @@
 go build -o build/core.dll -buildmode=c-shared .
 # 对于macOS系统
 go build -o build/core.dylib -buildmode=c-shared .
+
+# 如果你使用比较新版本的golang，使用下面的命令生成动态库
+#  macOS
+go build -buildmode=c-shared -ldflags="-s -w" -o build/core.dylib
+# Windows
+go build -buildmode=c-shared -ldflags="-s -w" -o build/core.dll
 ```

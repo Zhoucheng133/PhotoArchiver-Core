@@ -7,29 +7,38 @@ import (
 
 	"photoarchiver/types"
 
+	"github.com/andreiashu/geobed"
 	"github.com/rwcarlsen/goexif/exif"
 )
 
-func init() {
-	InitLocation()
+var g *geobed.GeoBed
+var countryByISO map[string]string
+
+func InitLocation() {
+	var err error
+	g, err = geobed.NewGeobed()
+	if err != nil {
+		return
+	}
+	countryByISO = make(map[string]string, len(g.Countries))
+	for _, c := range g.Countries {
+		countryByISO[c.ISO] = c.Country
+	}
 }
 
 func GetPhoto(path string) types.Photo {
-	datetime := GetCaptureTime(path)
-	if datetime == "" {
+	f, err := os.Open(path)
+	if err != nil {
+		return types.Photo{}
+	}
+	defer f.Close()
+	x, err := exif.Decode(f)
+	if err != nil || x == nil {
 		return types.Photo{}
 	}
 
-	country, city := "", ""
-	f, err := os.Open(path)
-	if err == nil {
-		defer f.Close()
-		if x, err := exif.Decode(f); err == nil && x != nil {
-			if lat, lng, err := x.LatLong(); err == nil {
-				country, city = GetLocation(lat, lng)
-			}
-		}
-	}
+	datetime := getCaptureTime(x)
+	country, city := getLocation(x)
 
 	return types.Photo{
 		Dir:      filepath.Dir(path),
@@ -40,19 +49,9 @@ func GetPhoto(path string) types.Photo {
 	}
 }
 
-func GetCaptureTime(path string) string {
-	f, err := os.Open(path)
-	if err != nil {
-		return ""
-	}
-	defer f.Close()
-
-	x, err := exif.Decode(f)
-	if err != nil || x == nil {
-		return ""
-	}
+func getCaptureTime(exifData *exif.Exif) string {
 	getTagString := func(name exif.FieldName) string {
-		tag, err := x.Get(name)
+		tag, err := exifData.Get(name)
 		if err != nil || tag == nil {
 			return ""
 		}
@@ -60,4 +59,27 @@ func GetCaptureTime(path string) string {
 	}
 	originalTime := strings.ReplaceAll(getTagString(exif.DateTimeOriginal), "\"", "")
 	return strings.Replace(originalTime, ":", "/", 2)
+}
+
+func getLocation(exifData *exif.Exif) (string, string) {
+	country, city := "", ""
+	lat, lng, err := exifData.LatLong()
+	if err != nil {
+		return country, city
+	}
+	if g == nil {
+		InitLocation()
+	}
+	if g == nil {
+		return country, city
+	}
+	result := g.ReverseGeocode(lat, lng)
+	countryCode := result.Country()
+	countryName := countryCode
+	if name, ok := countryByISO[countryCode]; ok {
+		countryName = name
+		country = countryName
+		city = result.City
+	}
+	return country, city
 }

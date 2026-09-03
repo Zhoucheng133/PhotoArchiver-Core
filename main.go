@@ -11,64 +11,23 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
+	"photoarchiver/types"
+	"photoarchiver/utils"
 	"sync/atomic"
-
-	"github.com/rwcarlsen/goexif/exif"
 )
 
 var stopFlag atomic.Bool
 
-type Photo struct {
-	Dir      string `json:"dir"`
-	Name     string `json:"name"`
-	DateTime string `json:"datetime"`
-}
-
 //export GetPhoto
 func GetPhoto(path *C.char) *C.char {
-	var data Photo = getPhoto(C.GoString(path))
-	if data == (Photo{}) {
+	var data types.Photo = utils.GetPhoto(C.GoString(path))
+	if data == (types.Photo{}) {
 		return C.CString("")
 	}
 
 	json, _ := json.Marshal(data)
 
 	return C.CString(string(json))
-}
-
-func getPhoto(path string) Photo {
-	datetime := getCaptureTime(path)
-	if datetime == "" {
-		return Photo{}
-	}
-	return Photo{
-		Dir:      filepath.Dir(path),
-		Name:     filepath.Base(path),
-		DateTime: datetime,
-	}
-}
-
-func getCaptureTime(path string) string {
-	f, err := os.Open(path)
-	if err != nil {
-		return ""
-	}
-	defer f.Close()
-
-	x, err := exif.Decode(f)
-	if err != nil || x == nil {
-		return ""
-	}
-	getTagString := func(name exif.FieldName) string {
-		tag, err := x.Get(name)
-		if err != nil || tag == nil {
-			return ""
-		}
-		return tag.String()
-	}
-	originalTime := strings.ReplaceAll(getTagString(exif.DateTimeOriginal), "\"", "")
-	return strings.Replace(originalTime, ":", "/", 2)
 }
 
 //export StopScan
@@ -89,9 +48,9 @@ func ScanDir(path *C.char) *C.char {
 	return C.CString(string(data))
 }
 
-func scanDir(path string) []Photo {
+func scanDir(path string) []types.Photo {
 	stopFlag.Store(false)
-	var files []Photo
+	var files []types.Photo
 	entries, err := os.ReadDir(path)
 	if err != nil {
 		return files
@@ -101,13 +60,10 @@ func scanDir(path string) []Photo {
 			return files
 		}
 		if !entry.IsDir() && entry.Name() != ".DS_Store" {
-			datetime := getCaptureTime(filepath.Join(path, entry.Name()))
-			if datetime != "" {
-				files = append(files, Photo{
-					Name:     entry.Name(),
-					Dir:      path,
-					DateTime: datetime,
-				})
+			photoPath := filepath.Join(path, entry.Name())
+			photo := utils.GetPhoto(photoPath)
+			if photo.DateTime != "" {
+				files = append(files, photo)
 			}
 		}
 	}

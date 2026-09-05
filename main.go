@@ -20,8 +20,8 @@ var stopFlag atomic.Bool
 
 //export GetPhoto
 func GetPhoto(path *C.char) *C.char {
-	var data types.Photo = utils.GetPhoto(C.GoString(path))
-	if data == (types.Photo{}) {
+	data, err := utils.GetPhoto(C.GoString(path))
+	if err != nil {
 		return C.CString("")
 	}
 
@@ -61,7 +61,10 @@ func scanDir(path string) []types.Photo {
 		}
 		if !entry.IsDir() && entry.Name() != ".DS_Store" {
 			photoPath := filepath.Join(path, entry.Name())
-			photo := utils.GetPhoto(photoPath)
+			photo, err := utils.GetPhoto(photoPath)
+			if err != nil {
+				continue
+			}
 			if photo.DateTime != "" {
 				files = append(files, photo)
 			}

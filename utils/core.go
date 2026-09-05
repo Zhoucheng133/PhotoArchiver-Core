@@ -9,6 +9,8 @@ import (
 
 	"photoarchiver/types"
 
+	"errors"
+
 	"github.com/andreiashu/geobed"
 	"github.com/rwcarlsen/goexif/exif"
 	"go4.org/media/heif"
@@ -29,28 +31,28 @@ func InitLocation() {
 	}
 }
 
-func GetPhoto(path string) types.Photo {
+func GetPhoto(path string) (types.Photo, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return types.Photo{}
+		return types.Photo{}, errors.New("cannot open")
 	}
 	defer f.Close()
 
 	x, err := decodeEXIF(f, path)
 	if err != nil || x == nil {
-		return types.Photo{}
+		return types.Photo{}, errors.New("no exif data")
 	}
 
 	datetime := getCaptureTime(x)
-	country, city := getLocation(x)
+	country, city, cityAlt := getLocation(x)
 
 	return types.Photo{
 		Dir:      filepath.Dir(path),
 		Name:     filepath.Base(path),
 		DateTime: datetime,
-		Country:  country,
-		City:     city,
-	}
+		Country:  ConvertCountry(country),
+		City:     ConvertCity(cityAlt, city),
+	}, nil
 }
 
 func decodeEXIF(f *os.File, path string) (*exif.Exif, error) {
@@ -93,17 +95,17 @@ func getCaptureTime(exifData *exif.Exif) string {
 	return strings.Replace(originalTime, ":", "/", 2)
 }
 
-func getLocation(exifData *exif.Exif) (string, string) {
-	country, city := "", ""
+func getLocation(exifData *exif.Exif) (string, string, string) {
+	country, city, cityAlt := "", "", ""
 	lat, lng, err := exifData.LatLong()
 	if err != nil {
-		return country, city
+		return country, city, cityAlt
 	}
 	if g == nil {
 		InitLocation()
 	}
 	if g == nil {
-		return country, city
+		return country, city, cityAlt
 	}
 	result := g.ReverseGeocode(lat, lng)
 	countryCode := result.Country()
@@ -112,6 +114,7 @@ func getLocation(exifData *exif.Exif) (string, string) {
 		countryName = name
 		country = countryName
 		city = result.City
+		cityAlt = result.CityAlt
 	}
-	return country, city
+	return country, city, cityAlt
 }
